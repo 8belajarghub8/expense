@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CatatUang - Catatan Pengeluaran Harian</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+<!-- Tambahkan SDK Supabase di dalam tag <head> -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+  // 1. Inisialisasi Supabase
+  const SUPABASE_URL = 'https://sefcuozunezjkshuwaat.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_wQndiZeEmYiQcOPDl_skGw_0I29tmtn';
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 2. Fungsi Ambil Data dari Supabase Cloud
+  async function fetchExpenses() {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Gagal mengambil data:', error.message);
+      return [];
+    }
+    return data;
+  }
+
+  // 3. Fungsi Simpan Transaksi Baru
+  async function saveExpense(tanggal, nominal, deskripsi, kategori, extraData = {}) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert([
+        {
+          date: tanggal,
+          amount: nominal,
+          description: deskripsi,
+          category: kategori,
+          extra_fields: extraData
+        }
+      ]);
+
+    if (error) {
+      alert('Gagal menyimpan: ' + error.message);
+    } else {
+      alert('Pengeluaran berhasil disimpan!');
+      renderApp(); // Reload tampilan UI & Grafik
+    }
+  }
+
+  // 4. Fungsi Hapus Transaksi
+  async function deleteExpense(id) {
+    if (!confirm('Yakin ingin menghapus data ini?')) return;
+    
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert('Gagal menghapus: ' + error.message);
+    } else {
+      renderApp();
+    }
+  }
+</script>
+
+  <!--
+   <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+	--!>
+    <style>
+        /* Custom scrollbar and smooth transitions */
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-up { animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    </style>
+</head>
+<body class="h-full text-slate-800 antialiased flex flex-col justify-between selection:bg-brand-500 selection:text-white">
+
+    <div id="app" class="flex-1 max-w-md w-full mx-auto bg-white min-h-screen shadow-2xl flex flex-col pb-20 relative">
+        
+        <!-- Header Top Bar -->
+        <header class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 rounded-b-2xl shadow-md sticky top-0 z-30">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-2">
+                    <div class="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <i data-lucide="wallet" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight">CatatUang</h1>
+                        <p class="text-xs text-emerald-100 font-light">Kelola Keuangan Harian</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span id="currentMonthBadge" class="text-xs bg-emerald-800/60 px-2.5 py-1 rounded-full font-medium border border-emerald-400/30">
+                        Oktober 2026
+                    </span>
+                </div>
+            </div>
+
+            <!-- Header Quick Balance Card -->
+            <div class="mt-4 bg-white/10 p-3 rounded-xl backdrop-blur-md flex justify-between items-center border border-white/15">
+                <div>
+                    <span class="text-xs text-emerald-100 block">Total Pengeluaran Bulan Ini</span>
+                    <span id="headerTotalExpense" class="text-xl font-extrabold tracking-tight">Rp 0</span>
+                </div>
+                <div class="text-right">
+                    <span id="headerTransactionCount" class="text-xs bg-white/20 px-2 py-0.5 rounded-md font-semibold">0 Transaksi</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 p-4 overflow-y-auto">
+
+            <!-- TAB 1: FORM CATAT PENGELUARAN -->
+            <section id="tab-input" class="tab-content space-y-5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-5 h-5 text-emerald-600"></i>
+                        Tambah Pengeluaran
+                    </h2>
+                    <span class="text-xs text-slate-400">Dapat diisi beberapa kali/hari</span>
+                </div>
+
+                <form id="expenseForm" class="space-y-4">
+                    <!-- Dynamic Standard Field: Tanggal -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Tanggal Transaksi</label>
+                        <div class="relative">
+                            <input type="date" id="inputDate" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-sm font-medium">
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Standard Field: Nominal -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Nominal (Rp)</label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">Rp</span>
+                            <input type="number" id="inputAmount" placeholder="0" required min="1" step="100" class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-base font-bold text-slate-800">
+                        </div>
+                        <p id="amountFormatted" class="text-xs text-emerald-600 font-medium mt-1 ml-1 hidden"></p>
+                    </div>
+
+                    <!-- Dynamic Standard Field: Deskripsi Pengeluaran -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Untuk Pengeluaran Apa?</label>
+                        <input type="text" id="inputDescription" placeholder="Contoh: Nasi goreng, Bensin Pertalite, Kopi..." required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-sm">
+                        <p class="text-[11px] text-slate-400 mt-1">Kategori akan terdeteksi otomatis dari kata kunci deskripsi.</p>
+                    </div>
+
+                    <!-- Smart Auto-Category Notification & Selector -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Kategori Pengeluaran</label>
+                            <span id="autoCategoryBadge" class="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium hidden">
+                                ✨ Terdeteksi Otomatis
+                            </span>
+                        </div>
+                        <select id="inputCategory" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-sm font-medium">
+                            <!-- Populated dynamically via JS -->
+                        </select>
+                    </div>
+
+                    <!-- DYNAMIC FIELDS CONTAINER (Scalability Feature) -->
+                    <div id="dynamicFieldsContainer" class="pt-2 border-t border-slate-100 space-y-3">
+                        <!-- Dynamic fields injected here by FieldRegistry JS -->
+                    </div>
+
+                    <button type="submit" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2">
+                        <i data-lucide="check-circle" class="w-5 h-5"></i>
+                        Simpan Transaksi
+                    </button>
+                </form>
+
+                <!-- Quick Smart Shortcut Pills -->
+                <div class="pt-2">
+                    <span class="text-xs font-semibold text-slate-400 block mb-2">Contoh Cepat Kata Kunci:</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button type="button" onclick="quickFill('Nasi Goreng + Teh', 25000)" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200 transition">🍛 Nasi Goreng</button>
+                        <button type="button" onclick="quickFill('Kopi Susu', 18000)" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200 transition">☕ Kopi</button>
+                        <button type="button" onclick="quickFill('Bensin Pertalite', 50000)" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200 transition">⛽ Bensin</button>
+                        <button type="button" onclick="quickFill('Pulsa / Data', 100000)" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200 transition">📱 Pulsa</button>
+                        <button type="button" onclick="quickFill('Tiket Bioskop', 45000)" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200 transition">🎬 Bioskop</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: RIWAYAT TRANSAKSI -->
+            <section id="tab-history" class="tab-content hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="history" class="w-5 h-5 text-emerald-600"></i>
+                        Riwayat Pengeluaran
+                    </h2>
+                    <input type="month" id="historyMonthFilter" class="text-xs font-semibold bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg outline-none text-slate-700">
+                </div>
+
+                <!-- Expense Items Container -->
+                <div id="historyList" class="space-y-4">
+                    <!-- Rendered dynamically -->
+                </div>
+            </section>
+
+            <!-- TAB 3: SUMMARY & CHART LAPORAN BULANAN -->
+            <section id="tab-analytics" class="tab-content hidden space-y-5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="pie-chart" class="w-5 h-5 text-emerald-600"></i>
+                        Analisis & Persentase
+                    </h2>
+                    <input type="month" id="analyticsMonthPicker" class="text-xs font-semibold bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg outline-none text-slate-700">
+                </div>
+
+                <!-- Total Spent Card in Analytics -->
+                <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-lg flex justify-between items-center">
+                    <div>
+                        <span class="text-xs text-slate-400 block mb-0.5">Total Pengeluaran Bulan Ini</span>
+                        <h3 id="analyticsTotalText" class="text-2xl font-black text-emerald-400">Rp 0</h3>
+                    </div>
+                    <div class="text-right">
+                        <span id="analyticsAvgDaily" class="text-xs text-slate-300 block">Rata-rata: Rp 0/hari</span>
+                        <span id="analyticsMaxCategory" class="text-[11px] text-emerald-300 font-medium block mt-1">Terbanyak: -</span>
+                    </div>
+                </div>
+
+                <!-- Interactive Chart Container -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">Proporsi Pengeluaran Per Kategori</h4>
+                    <div class="relative h-64 w-full flex items-center justify-center">
+                        <canvas id="categoryPieChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Category Percentage Breakdown List -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rincian Persentase Kategori</h4>
+                    <div id="categoryBreakdownList" class="space-y-2.5">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: SKALABILITAS & FIELD KUSTOM (Dynamic Fields Registry) -->
+            <section id="tab-settings" class="tab-content hidden space-y-5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-5 h-5 text-emerald-600"></i>
+                        Pengaturan & Skalabilitas
+                    </h2>
+                    <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-medium">Modular System</span>
+                </div>
+
+                <div class="bg-indigo-50/50 border border-indigo-100 p-3.5 rounded-xl text-xs text-indigo-900 leading-relaxed">
+                    <p class="font-semibold mb-1 flex items-center gap-1">
+                        <i data-lucide="layers" class="w-4 h-4 text-indigo-600"></i> Desain Sistem Scalable
+                    </p>
+                    Anda dapat menambahkan <strong>Field Tambahan (Custom Fields)</strong> seperti <em>Metode Pembayaran, Catatan, atau Tag</em> secara dinamis tanpa merusak struktur data atau logika chart!
+                </div>
+
+                <!-- Manage Dynamic Fields Registry -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">Daftar Field Aktif</h3>
+                    <div id="activeFieldsList" class="space-y-2">
+                        <!-- Loaded dynamically -->
+                    </div>
+
+                    <button type="button" onclick="openAddFieldModal()" class="w-full py-2 px-3 border border-dashed border-emerald-500 text-emerald-700 hover:bg-emerald-50 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        Tambah Field Kustom Baru
+                    </button>
+                </div>
+
+                <!-- Data Management -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+                    <h3 class="text-sm font-bold text-slate-800">Kelola Data</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" onclick="exportDataJSON()" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition">
+                            <i data-lucide="download" class="w-4 h-4"></i> Ekspor JSON
+                        </button>
+                        <button type="button" onclick="resetToSampleData()" class="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Data Contoh
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-slate-200 z-40 px-2 py-1.5 flex justify-around items-center shadow-lg">
+            <button onclick="switchTab('input')" id="nav-input" class="nav-btn flex flex-col items-center py-1 px-3 text-emerald-600 font-semibold transition">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                <span class="text-[11px] mt-0.5">Catat</span>
+            </button>
+            <button onclick="switchTab('history')" id="nav-history" class="nav-btn flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition">
+                <i data-lucide="list" class="w-5 h-5"></i>
+                <span class="text-[11px] mt-0.5">Riwayat</span>
+            </button>
+            <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                <span class="text-[11px] mt-0.5">Laporan</span>
+            </button>
+            <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center py-1 px-3 text-slate-400 hover:text-slate-600 transition">
+                <i data-lucide="sliders" class="w-5 h-5"></i>
+                <span class="text-[11px] mt-0.5">Pengaturan</span>
+            </button>
+        </nav>
+
+        <!-- TOAST NOTIFICATION -->
+        <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-full shadow-2xl text-xs font-medium flex items-center gap-2 transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-4">
+            <i data-lucide="info" id="toastIcon" class="w-4 h-4 text-emerald-400"></i>
+            <span id="toastMessage">Pesan Notifikasi</span>
+        </div>
+
+        <!-- MODAL ADD CUSTOM FIELD -->
+        <div id="addFieldModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-2xl max-w-xs w-full p-5 shadow-2xl animate-slide-up space-y-4">
+                <div class="flex items-center justify-between border-b pb-2">
+                    <h3 class="font-bold text-sm text-slate-800">Tambah Field Kustom Baru</h3>
+                    <button onclick="closeAddFieldModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nama Label Field</label>
+                        <input type="text" id="newFieldLabel" placeholder="Misal: Toko / Merchant" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Tipe Field</label>
+                        <select id="newFieldType" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="text">Teks Bebas</option>
+                            <option value="number">Angka / Nominal</option>
+                            <option value="select">Pilihan Drodown</option>
+                        </select>
+                    </div>
+                    <div id="optionsGroup" class="hidden">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Opsi Dropdown (Pisahkan koma)</label>
+                        <input type="text" id="newFieldOptions" placeholder="QRIS, Tunai, Transfer" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeAddFieldModal()" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold">Batal</button>
+                    <button onclick="saveNewField()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold">Simpan Field</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONFIRMATION MODAL -->
+        <div id="confirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-2xl max-w-xs w-full p-5 shadow-2xl space-y-4 text-center">
+                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <h3 id="confirmTitle" class="font-bold text-sm text-slate-800">Hapus Transaksi?</h3>
+                <p id="confirmMessage" class="text-xs text-slate-500">Data yang dihapus tidak dapat dikembalikan.</p>
+                <div class="flex gap-2 pt-2">
+                    <button id="confirmCancelBtn" class="flex-1 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold">Batal</button>
+                    <button id="confirmOkBtn" class="flex-1 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold">Hapus</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * CATATUANG ARCHITECTURE ENGINE
+         * ----------------------------------------------------
+         * Modular, Scalable & Offline-first using LocalStorage.
+         */
+
+        // 1. SMART CATEGORY DEFINITIONS & KEYWORD MATCHING RULES
+        const CATEGORIES = [
+            { id: 'cat_makanan', name: 'Makanan & Minuman', color: '#10B981', icon: 'utensils', keywords: ['nasi', 'kopi', 'makan', 'minum', 'ayam', 'bakso', 'indomie', 'soto', 'cafe', 'kafe', 'warung', 'snack', 'boba', 'pizza', 'burger', 'rames', 'gofood', 'grabfood', 'shopeefood', 'es', 'roti', 'teh', 'jus', 'martabak', 'sate', 'sarapan', 'dinner', 'lunch'] },
+            { id: 'cat_transport', name: 'Transportasi', color: '#3B82F6', icon: 'car', keywords: ['bensin', 'ojek', 'grab', 'gojek', 'parkir', 'tol', 'motor', 'mobil', 'angkot', 'bus', 'kereta', 'tiket', 'pertalite', 'pertamax', 'shell', 'maxim', 'mrt', 'lrt', 'krl', 'service', 'tambal', 'cuci'] },
+            { id: 'cat_tagihan', name: 'Tagihan & Utilitas', color: '#EF4444', icon: 'receipt', keywords: ['listrik', 'pulsa', 'kuota', 'wifi', 'indihome', 'pdam', 'air', 'iuran', 'bpjs', 'kontrakan', 'kos', 'cicilan', 'sewa', 'pln', 'telkom', 'kartu kredit', 'asuransi'] },
+            { id: 'cat_belanja', name: 'Belanja', color: '#F59E0B', icon: 'shopping-bag', keywords: ['baju', 'sepatu', 'skincare', 'toko', 'minimarket', 'indomaret', 'alfamart', 'tokopedia', 'shopee', 'lazada', 'pasar', 'sabun', 'celana', 'kaos', 'tas', 'makeup', 'supermarket', 'mall', 'baju'] },
+            { id: 'cat_hiburan', name: 'Hiburan', color: '#8B5CF6', icon: 'film', keywords: ['bioskop', 'xxi', 'game', 'steam', 'netflix', 'spotify', 'liburan', 'jalan', 'voucher', 'konser', 'wisata', 'youtube', 'topup', 'dufan', 'drakor'] },
+            { id: 'cat_kesehatan', name: 'Kesehatan', color: '#EC4899', icon: 'heart-pulse', keywords: ['obat', 'apotek', 'dokter', 'rumahsakit', 'hospital', 'vitamin', 'masker', 'klinik', 'pemeriksaan', 'tes', 'lab', 'retinoid', 'fisioterapi'] },
+            { id: 'cat_pendidikan', name: 'Pendidikan', color: '#06B6D4', icon: 'book-open', keywords: ['buku', 'kursus', 'spp', 'sekolah', 'kuliah', 'pensil', 'alat tulis', 'seminar', 'workshop', 'sertifikasi', 'udemy', 'bimbingan', 'les'] },
+            { id: 'cat_lain', name: 'Lain-lain', color: '#64748B', icon: 'more-horizontal', keywords: [] }
+        ];
+
+        // 2. DYNAMIC FIELD REGISTRY (Ensures Scalability)
+        // System can add new fields dynamically without altering chart/item core schema!
+        let defaultFieldRegistry = [
+            {
+                key: 'paymentMethod',
+                label: 'Metode Pembayaran',
+                type: 'select',
+                options: ['QRIS / E-Wallet', 'Tunai', 'Transfer Bank', 'Kartu Kredit'],
+                defaultValue: 'QRIS / E-Wallet',
+                isSystem: false
+            },
+            {
+                key: 'notes',
+                label: 'Catatan Tambahan',
+                type: 'text',
+                options: [],
+                defaultValue: '',
+                isSystem: false
+            }
+        ];
+
+        // LOCAL STORAGE KEYS
+        const STORAGE_KEY_EXPENSES = 'catatuang_expenses_data_v1';
+        const STORAGE_KEY_REGISTRY = 'catatuang_field_registry_v1';
+
+        // APP STATE
+        let expenses = [];
+        let fieldRegistry = [];
+        let pieChartInstance = null;
+        let isUserCategoryOverridden = false;
+
+        // INITIALIZATION
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFieldRegistry();
+            loadExpensesData();
+            initFormDefaults();
+            setupEventListeners();
+            renderDynamicFormFields();
+            renderActiveFieldsList();
+            renderHistoryView();
+            renderAnalyticsView();
+            updateHeaderMetrics();
+            lucide.createIcons();
+        });
+
+        function loadFieldRegistry() {
+            const saved = localStorage.getItem(STORAGE_KEY_REGISTRY);
+            if (saved) {
+                try {
+                    fieldRegistry = JSON.parse(saved);
+                } catch(e) {
+                    fieldRegistry = defaultFieldRegistry;
+                }
+            } else {
+                fieldRegistry = defaultFieldRegistry;
+                saveFieldRegistry();
+            }
+        }
+
+        function saveFieldRegistry() {
+            localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(fieldRegistry));
+        }
+
+        function loadExpensesData() {
+            const saved = localStorage.getItem(STORAGE_KEY_EXPENSES);
+            if (saved) {
+                try {
+                    expenses = JSON.parse(saved);
+                } catch(e) {
+                    generateSampleData();
+                }
+            } else {
+                generateSampleData();
+            }
+        }
+
+        function saveExpensesData() {
+            localStorage.setItem(STORAGE_KEY_EXPENSES, JSON.stringify(expenses));
+            updateHeaderMetrics();
+        }
+
+        function generateSampleData() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+
+            expenses = [
+                {
+                    id: 'exp_' + Date.now() + '_1',
+                    date: `${year}-${month}-01`,
+                    amount: 35000,
+                    description: 'Nasi Rames & Es Teh',
+                    category: 'Makanan & Minuman',
+                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: 'Makan siang dikantor' },
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'exp_' + Date.now() + '_2',
+                    date: `${year}-${month}-01`,
+                    amount: 50000,
+                    description: 'Bensin Pertalite Motor',
+                    category: 'Transportasi',
+                    customFields: { paymentMethod: 'Tunai', notes: 'Isi di SPBU Pemuda' },
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'exp_' + Date.now() + '_3',
+                    date: `${year}-${month}-02`,
+                    amount: 250000,
+                    description: 'Tagihan Pulsa & Kuota Internet',
+                    category: 'Tagihan & Utilitas',
+                    customFields: { paymentMethod: 'Transfer Bank', notes: 'Paket bulanan' },
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'exp_' + Date.now() + '_4',
+                    date: `${year}-${month}-03`,
+                    amount: 180000,
+                    description: 'Belanja Bulanan Indomaret',
+                    category: 'Belanja',
+                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: 'Sabun, sampo, snack' },
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'exp_' + Date.now() + '_5',
+                    date: `${year}-${month}-03`,
+                    amount: 45000,
+                    description: 'Kopi Susu Kekinian',
+                    category: 'Makanan & Minuman',
+                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: '' },
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: 'exp_' + Date.now() + '_6',
+                    date: `${year}-${month}-04`,
+                    amount: 90000,
+                    description: 'Tiket Nonton Bioskop XXI',
+                    category: 'Hiburan',
+                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: 'Weekend movie' },
+                    createdAt: new Date().toISOString()
+                }
+            ];
+            saveExpensesData();
+        }
+
+        function initFormDefaults() {
+            // Set date picker to TODAY by default
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('inputDate').value = today;
+
+            // Populate category select options
+            const categorySelect = document.getElementById('inputCategory');
+            categorySelect.innerHTML = CATEGORIES.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('');
+
+            // Set default month selectors
+            const currentMonthStr = today.substring(0, 7);
+            document.getElementById('historyMonthFilter').value = currentMonthStr;
+            document.getElementById('analyticsMonthPicker').value = currentMonthStr;
+        }
+
+        function setupEventListeners() {
+            // Description input smart detection listener
+            const descInput = document.getElementById('inputDescription');
+            descInput.addEventListener('input', (e) => {
+                if (!isUserCategoryOverridden) {
+                    detectCategoryAutomatically(e.target.value);
+                }
+            });
+
+            // Manual Category override listener
+            const categorySelect = document.getElementById('inputCategory');
+            categorySelect.addEventListener('change', () => {
+                isUserCategoryOverridden = true;
+                const badge = document.getElementById('autoCategoryBadge');
+                badge.classList.add('hidden');
+            });
+
+            // Amount formatting helper
+            const amountInput = document.getElementById('inputAmount');
+            const amountFormatted = document.getElementById('amountFormatted');
+            amountInput.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0) {
+                    amountFormatted.textContent = formatIDR(val);
+                    amountFormatted.classList.remove('hidden');
+                } else {
+                    amountFormatted.classList.add('hidden');
+                }
+            });
+
+            // Form Submit Listener
+            document.getElementById('expenseForm').addEventListener('submit', handleFormSubmit);
+
+            // Month Filter Change Listeners
+            document.getElementById('historyMonthFilter').addEventListener('change', renderHistoryView);
+            document.getElementById('analyticsMonthPicker').addEventListener('change', renderAnalyticsView);
+
+            // Add Custom Field Type Change
+            document.getElementById('newFieldType').addEventListener('change', (e) => {
+                const optsGroup = document.getElementById('optionsGroup');
+                if (e.target.value === 'select') {
+                    optsGroup.classList.remove('hidden');
+                } else {
+                    optsGroup.classList.add('hidden');
+                }
+            });
+        }
+
+        // SMART CATEGORIZATION ENGINE
+        function detectCategoryAutomatically(text) {
+            if (!text || text.trim() === '') {
+                document.getElementById('autoCategoryBadge').classList.add('hidden');
+                return;
+            }
+
+            const cleanText = text.toLowerCase();
+            let matchedCategory = 'Lain-lain';
+
+            for (const cat of CATEGORIES) {
+                if (cat.keywords.some(keyword => cleanText.includes(keyword))) {
+                    matchedCategory = cat.name;
+                    break;
+                }
+            }
+
+            const categorySelect = document.getElementById('inputCategory');
+            categorySelect.value = matchedCategory;
+
+            const badge = document.getElementById('autoCategoryBadge');
+            if (matchedCategory !== 'Lain-lain') {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function renderDynamicFormFields() {
+            const container = document.getElementById('dynamicFieldsContainer');
+            container.innerHTML = '';
+
+            fieldRegistry.forEach(field => {
+                const fieldDiv = document.createElement('div');
+                
+                let inputHTML = '';
+                if (field.type === 'select') {
+                    const optionsHTML = field.options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                    inputHTML = `<select id="dyn_${field.key}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">${optionsHTML}</select>`;
+                } else if (field.type === 'number') {
+                    inputHTML = `<input type="number" id="dyn_${field.key}" placeholder="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">`;
+                } else {
+                    inputHTML = `<input type="text" id="dyn_${field.key}" placeholder="${field.label}..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">`;
+                }
+
+                fieldDiv.innerHTML = `
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">${field.label}</label>
+                    ${inputHTML}
+                `;
+                container.appendChild(fieldDiv);
+            });
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const date = document.getElementById('inputDate').value;
+            const amount = parseFloat(document.getElementById('inputAmount').value);
+            const description = document.getElementById('inputDescription').value.trim();
+            const category = document.getElementById('inputCategory').value;
+
+            if (!date || isNaN(amount) || amount <= 0 || !description) {
+                showToast('Mohon isi tanggal, nominal, dan deskripsi dengan benar.', 'alert-circle');
+                return;
+            }
+
+            // Extract dynamic field values automatically
+            const customFields = {};
+            fieldRegistry.forEach(field => {
+                const el = document.getElementById(`dyn_${field.key}`);
+                if (el) {
+                    customFields[field.key] = el.value;
+                }
+            });
+
+            const newExpense = {
+                id: 'exp_' + Date.now(),
+                date,
+                amount,
+                description,
+                category,
+                customFields,
+                createdAt: new Date().toISOString()
+            };
+
+            expenses.unshift(newExpense);
+            saveExpensesData();
+
+            // Reset Form
+            document.getElementById('inputAmount').value = '';
+            document.getElementById('inputDescription').value = '';
+            document.getElementById('amountFormatted').classList.add('hidden');
+            document.getElementById('autoCategoryBadge').classList.add('hidden');
+            isUserCategoryOverridden = false;
+
+            showToast('Pengeluaran berhasil dicatat!', 'check-circle');
+
+            // Refresh Views
+            renderHistoryView();
+            renderAnalyticsView();
+        }
+
+        function quickFill(desc, amount) {
+            document.getElementById('inputDescription').value = desc;
+            document.getElementById('inputAmount').value = amount;
+            document.getElementById('amountFormatted').textContent = formatIDR(amount);
+            document.getElementById('amountFormatted').classList.remove('hidden');
+            isUserCategoryOverridden = false;
+            detectCategoryAutomatically(desc);
+        }
+
+        function renderHistoryView() {
+            const container = document.getElementById('historyList');
+            const selectedMonth = document.getElementById('historyMonthFilter').value; // YYYY-MM
+
+            // Filter expenses by selected month
+            const filtered = expenses.filter(exp => exp.date.startsWith(selectedMonth));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-slate-400 space-y-2">
+                        <i data-lucide="inbox" class="w-10 h-10 mx-auto text-slate-300"></i>
+                        <p class="text-xs font-medium">Belum ada catatan pengeluaran di bulan ini.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            // Group expenses by Date
+            const grouped = {};
+            filtered.forEach(exp => {
+                if (!grouped[exp.date]) grouped[exp.date] = [];
+                grouped[exp.date].push(exp);
+            });
+
+            // Sort dates descending
+            const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+
+            let html = '';
+            sortedDates.forEach(dateStr => {
+                const dailyTotal = grouped[dateStr].reduce((sum, item) => sum + item.amount, 0);
+                const formattedDate = formatDateDisplay(dateStr);
+
+                html += `
+                    <div class="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+                        <!-- Date Header -->
+                        <div class="bg-slate-50 px-3.5 py-2 border-b border-slate-100 flex justify-between items-center text-xs">
+                            <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
+                                ${formattedDate}
+                            </span>
+                            <span class="font-extrabold text-slate-800 bg-emerald-100/60 text-emerald-800 px-2 py-0.5 rounded-md">
+                                Subtotal: ${formatIDR(dailyTotal)}
+                            </span>
+                        </div>
+                        <!-- Items -->
+                        <div class="divide-y divide-slate-100">
+                `;
+
+                grouped[dateStr].forEach(item => {
+                    const categoryObj = CATEGORIES.find(c => c.name === item.category) || CATEGORIES[CATEGORIES.length - 1];
+                    
+                    // Format custom fields badge pills
+                    let customBadges = '';
+                    if (item.customFields) {
+                        Object.keys(item.customFields).forEach(k => {
+                            const val = item.customFields[k];
+                            if (val) {
+                                customBadges += `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${val}</span> `;
+                            }
+                        });
+                    }
+
+                    html += `
+                        <div class="p-3.5 flex items-center justify-between hover:bg-slate-50/50 transition">
+                            <div class="flex items-center space-x-3">
+                                <div class="p-2.5 rounded-xl text-white flex-shrink-0" style="background-color: ${categoryObj.color}">
+                                    <i data-lucide="${categoryObj.icon}" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-bold text-slate-800 leading-snug">${escapeHTML(item.description)}</h4>
+                                    <div class="flex items-center gap-1 mt-1 flex-wrap">
+                                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full" style="background-color: ${categoryObj.color}15; color: ${categoryObj.color}">
+                                            ${item.category}
+                                        </span>
+                                        ${customBadges}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right flex items-center space-x-2">
+                                <div>
+                                    <span class="block text-xs font-black text-slate-900">${formatIDR(item.amount)}</span>
+                                </div>
+                                <button onclick="confirmDeleteExpense('${item.id}')" class="p-1.5 text-slate-300 hover:text-rose-600 transition rounded-lg hover:bg-rose-50">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function renderAnalyticsView() {
+            const selectedMonth = document.getElementById('analyticsMonthPicker').value; // YYYY-MM
+            const filtered = expenses.filter(exp => exp.date.startsWith(selectedMonth));
+
+            const totalAmount = filtered.reduce((sum, item) => sum + item.amount, 0);
+            
+            // Calculate Daily Average
+            const daysInMonth = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate();
+            const avgDaily = totalAmount > 0 ? Math.round(totalAmount / daysInMonth) : 0;
+
+            document.getElementById('analyticsTotalText').textContent = formatIDR(totalAmount);
+            document.getElementById('analyticsAvgDaily').textContent = `Rata-rata: ${formatIDR(avgDaily)}/hari`;
+
+            // Calculate Totals per Category
+            const categoryTotals = {};
+            CATEGORIES.forEach(cat => categoryTotals[cat.name] = 0);
+
+            filtered.forEach(exp => {
+                if (categoryTotals[exp.category] !== undefined) {
+                    categoryTotals[exp.category] += exp.amount;
+                } else {
+                    categoryTotals['Lain-lain'] += exp.amount;
+                }
+            });
+
+            // Find Max Category
+            let maxCat = '-';
+            let maxVal = 0;
+            Object.keys(categoryTotals).forEach(catName => {
+                if (categoryTotals[catName] > maxVal) {
+                    maxVal = categoryTotals[catName];
+                    maxCat = catName;
+                }
+            });
+            document.getElementById('analyticsMaxCategory').textContent = totalAmount > 0 ? `Terbanyak: ${maxCat}` : 'Terbanyak: -';
+
+            // Prepare Data for Chart & Breakdown
+            const chartLabels = [];
+            const chartData = [];
+            const chartColors = [];
+            const breakdownData = [];
+
+            CATEGORIES.forEach(cat => {
+                const amount = categoryTotals[cat.name];
+                const percentage = totalAmount > 0 ? ((amount / totalAmount) * 100).toFixed(1) : '0.0';
+
+                if (amount > 0) {
+                    chartLabels.push(cat.name);
+                    chartData.push(amount);
+                    chartColors.push(cat.color);
+                }
+
+                breakdownData.push({
+                    name: cat.name,
+                    amount: amount,
+                    percentage: parseFloat(percentage),
+                    color: cat.color,
+                    icon: cat.icon
+                });
+            });
+
+            // Render Chart.js Pie/Doughnut Chart
+            renderChart(chartLabels, chartData, chartColors);
+
+            // Render Percentage Breakdown List
+            renderBreakdownList(breakdownData, totalAmount);
+        }
+
+        function renderChart(labels, data, colors) {
+            const ctx = document.getElementById('categoryPieChart').getContext('2d');
+
+            if (pieChartInstance) {
+                pieChartInstance.destroy();
+            }
+
+            if (data.length === 0) {
+                // Empty state chart fallback
+                pieChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Belum Ada Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#E2E8F0']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } }
+                    }
+                });
+                return;
+            }
+
+            pieChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 10, family: 'Inter' },
+                                boxWidth: 12,
+                                padding: 12
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw || 0;
+                                    return ` ${context.label}: ${formatIDR(value)}`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function renderBreakdownList(dataList, total) {
+            const container = document.getElementById('categoryBreakdownList');
+            
+            // Sort categories by highest spent
+            dataList.sort((a, b) => b.amount - a.amount);
+
+            let html = '';
+            dataList.forEach(item => {
+                if (item.amount === 0) return; // Hide zero categories
+
+                html += `
+                    <div class="bg-white border border-slate-200/80 p-3 rounded-xl space-y-1.5 shadow-sm">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-slate-800 flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${item.color}"></span>
+                                ${item.name}
+                            </span>
+                            <div class="text-right">
+                                <span class="font-black text-slate-900">${formatIDR(item.amount)}</span>
+                                <span class="text-slate-400 text-[11px] font-semibold ml-1">(${item.percentage}%)</span>
+                            </div>
+                        </div>
+                        <!-- Progress bar -->
+                        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500" style="width: ${item.percentage}%; background-color: ${item.color}"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (html === '') {
+                html = `<p class="text-xs text-slate-400 text-center py-4">Belum ada pengeluaran pada periode ini.</p>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderActiveFieldsList() {
+            const container = document.getElementById('activeFieldsList');
+            container.innerHTML = '';
+
+            fieldRegistry.forEach((field, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs';
+                item.innerHTML = `
+                    <div>
+                        <span class="font-bold text-slate-800 block">${field.label}</span>
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">Tipe: ${field.type} ${field.options ? '(' + field.options.length + ' opsi)' : ''}</span>
+                    </div>
+                    <button onclick="removeCustomField(${index})" class="text-slate-400 hover:text-rose-600 transition p-1">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        function openAddFieldModal() {
+            document.getElementById('addFieldModal').classList.remove('hidden');
+        }
+
+        function closeAddFieldModal() {
+            document.getElementById('addFieldModal').classList.add('hidden');
+        }
+
+        function saveNewField() {
+            const label = document.getElementById('newFieldLabel').value.trim();
+            const type = document.getElementById('newFieldType').value;
+            const optionsRaw = document.getElementById('newFieldOptions').value.trim();
+
+            if (!label) {
+                showToast('Nama label field wajib diisi.', 'alert-circle');
+                return;
+            }
+
+            const key = 'custom_' + Date.now();
+            const options = type === 'select' && optionsRaw ? optionsRaw.split(',').map(s => s.trim()) : [];
+
+            fieldRegistry.push({
+                key,
+                label,
+                type,
+                options,
+                defaultValue: options[0] || '',
+                isSystem: false
+            });
+
+            saveFieldRegistry();
+            renderDynamicFormFields();
+            renderActiveFieldsList();
+            closeAddFieldModal();
+
+            document.getElementById('newFieldLabel').value = '';
+            document.getElementById('newFieldOptions').value = '';
+
+            showToast('Field kustom berhasil ditambahkan!', 'check-circle');
+        }
+
+        function removeCustomField(index) {
+            fieldRegistry.splice(index, 1);
+            saveFieldRegistry();
+            renderDynamicFormFields();
+            renderActiveFieldsList();
+            showToast('Field kustom dihapus.', 'info');
+        }
+
+        function updateHeaderMetrics() {
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            // Format Badge Text
+            const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            document.getElementById('currentMonthBadge').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+
+            const filtered = expenses.filter(exp => exp.date.startsWith(currentMonthStr));
+            const total = filtered.reduce((sum, item) => sum + item.amount, 0);
+
+            document.getElementById('headerTotalExpense').textContent = formatIDR(total);
+            document.getElementById('headerTransactionCount').textContent = `${filtered.length} Transaksi`;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-emerald-600', 'font-semibold');
+                btn.classList.add('text-slate-400');
+            });
+
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            activeBtn.classList.remove('text-slate-400');
+            activeBtn.classList.add('text-emerald-600', 'font-semibold');
+
+            if (tabId === 'history') renderHistoryView();
+            if (tabId === 'analytics') renderAnalyticsView();
+        }
+
+        let pendingDeleteId = null;
+        function confirmDeleteExpense(id) {
+            pendingDeleteId = id;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        document.getElementById('confirmCancelBtn').addEventListener('click', () => {
+            pendingDeleteId = null;
+            document.getElementById('confirmModal').classList.add('hidden');
+        });
+
+        document.getElementById('confirmOkBtn').addEventListener('click', () => {
+            if (pendingDeleteId) {
+                expenses = expenses.filter(e => e.id !== pendingDeleteId);
+                saveExpensesData();
+                renderHistoryView();
+                renderAnalyticsView();
+                showToast('Pengeluaran berhasil dihapus.', 'check');
+            }
+            pendingDeleteId = null;
+            document.getElementById('confirmModal').classList.add('hidden');
+        });
+
+        function showToast(msg, iconName = 'info') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            
+            toast.classList.remove('opacity-0', 'pointer-events-none', '-translate-y-4');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'pointer-events-none', '-translate-y-4');
+            }, 3000);
+        }
+
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(expenses, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `CatatUang_Backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('Data berhasil diekspor!', 'download');
+        }
+
+        function resetToSampleData() {
+            generateSampleData();
+            renderHistoryView();
+            renderAnalyticsView();
+            showToast('Data dikembalikan ke contoh awal.', 'rotate-ccw');
+        }
+
+        function formatIDR(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatDateDisplay(dateStr) {
+            const [y, m, d] = dateStr.split('-');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+            return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>
