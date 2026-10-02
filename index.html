@@ -13,92 +13,10 @@
     <!-- Google Font: Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-<!-- Tambahkan SDK Supabase di dalam tag <head> -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SDK Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<script>
-  // 1. Inisialisasi Supabase
-  const SUPABASE_URL = 'https://sefcuozunezjkshuwaat.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_wQndiZeEmYiQcOPDl_skGw_0I29tmtn';
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // 2. Fungsi Ambil Data dari Supabase Cloud
-  async function fetchExpenses() {
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .order('date', { ascending: false });
-
-    if (error) {
-      console.error('Gagal mengambil data:', error.message);
-      return [];
-    }
-    return data;
-  }
-
-  // 3. Fungsi Simpan Transaksi Baru
-  async function saveExpense(tanggal, nominal, deskripsi, kategori, extraData = {}) {
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert([
-        {
-          date: tanggal,
-          amount: nominal,
-          description: deskripsi,
-          category: kategori,
-          extra_fields: extraData
-        }
-      ]);
-
-    if (error) {
-      alert('Gagal menyimpan: ' + error.message);
-    } else {
-      alert('Pengeluaran berhasil disimpan!');
-      renderApp(); // Reload tampilan UI & Grafik
-    }
-  }
-
-  // 4. Fungsi Hapus Transaksi
-  async function deleteExpense(id) {
-    if (!confirm('Yakin ingin menghapus data ini?')) return;
-    
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      alert('Gagal menghapus: ' + error.message);
-    } else {
-      renderApp();
-    }
-  }
-</script>
-
-  <!--
-   <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#ecfdf5',
-                            100: '#d1fae5',
-                            500: '#10b981',
-                            600: '#059669',
-                            700: '#047857',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-	--!>
     <style>
-        /* Custom scrollbar and smooth transitions */
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -158,7 +76,6 @@
                 </div>
 
                 <form id="expenseForm" class="space-y-4">
-                    <!-- Dynamic Standard Field: Tanggal -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Tanggal Transaksi</label>
                         <div class="relative">
@@ -166,24 +83,22 @@
                         </div>
                     </div>
 
-                    <!-- Dynamic Standard Field: Nominal -->
+                    <!-- Nominal Input diperbaiki: step="any" -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Nominal (Rp)</label>
                         <div class="relative">
                             <span class="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">Rp</span>
-                            <input type="number" id="inputAmount" placeholder="0" required min="1" step="100" class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-base font-bold text-slate-800">
+                            <input type="number" id="inputAmount" placeholder="0" required min="1" step="any" class="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-base font-bold text-slate-800">
                         </div>
                         <p id="amountFormatted" class="text-xs text-emerald-600 font-medium mt-1 ml-1 hidden"></p>
                     </div>
 
-                    <!-- Dynamic Standard Field: Deskripsi Pengeluaran -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Untuk Pengeluaran Apa?</label>
                         <input type="text" id="inputDescription" placeholder="Contoh: Nasi goreng, Bensin Pertalite, Kopi..." required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-sm">
                         <p class="text-[11px] text-slate-400 mt-1">Kategori akan terdeteksi otomatis dari kata kunci deskripsi.</p>
                     </div>
 
-                    <!-- Smart Auto-Category Notification & Selector -->
                     <div>
                         <div class="flex items-center justify-between mb-1">
                             <label class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Kategori Pengeluaran</label>
@@ -192,13 +107,10 @@
                             </span>
                         </div>
                         <select id="inputCategory" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition text-sm font-medium">
-                            <!-- Populated dynamically via JS -->
                         </select>
                     </div>
 
-                    <!-- DYNAMIC FIELDS CONTAINER (Scalability Feature) -->
                     <div id="dynamicFieldsContainer" class="pt-2 border-t border-slate-100 space-y-3">
-                        <!-- Dynamic fields injected here by FieldRegistry JS -->
                     </div>
 
                     <button type="submit" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2">
@@ -207,7 +119,6 @@
                     </button>
                 </form>
 
-                <!-- Quick Smart Shortcut Pills -->
                 <div class="pt-2">
                     <span class="text-xs font-semibold text-slate-400 block mb-2">Contoh Cepat Kata Kunci:</span>
                     <div class="flex flex-wrap gap-1.5">
@@ -230,13 +141,11 @@
                     <input type="month" id="historyMonthFilter" class="text-xs font-semibold bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg outline-none text-slate-700">
                 </div>
 
-                <!-- Expense Items Container -->
                 <div id="historyList" class="space-y-4">
-                    <!-- Rendered dynamically -->
                 </div>
             </section>
 
-            <!-- TAB 3: SUMMARY & CHART LAPORAN BULANAN -->
+            <!-- TAB 3: SUMMARY & CHART LAPORAN -->
             <section id="tab-analytics" class="tab-content hidden space-y-5">
                 <div class="flex items-center justify-between">
                     <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -246,7 +155,6 @@
                     <input type="month" id="analyticsMonthPicker" class="text-xs font-semibold bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg outline-none text-slate-700">
                 </div>
 
-                <!-- Total Spent Card in Analytics -->
                 <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-lg flex justify-between items-center">
                     <div>
                         <span class="text-xs text-slate-400 block mb-0.5">Total Pengeluaran Bulan Ini</span>
@@ -258,7 +166,6 @@
                     </div>
                 </div>
 
-                <!-- Interactive Chart Container -->
                 <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
                     <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 text-center">Proporsi Pengeluaran Per Kategori</h4>
                     <div class="relative h-64 w-full flex items-center justify-center">
@@ -266,16 +173,14 @@
                     </div>
                 </div>
 
-                <!-- Category Percentage Breakdown List -->
                 <div class="space-y-2">
                     <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rincian Persentase Kategori</h4>
                     <div id="categoryBreakdownList" class="space-y-2.5">
-                        <!-- Rendered dynamically -->
                     </div>
                 </div>
             </section>
 
-            <!-- TAB 4: SKALABILITAS & FIELD KUSTOM (Dynamic Fields Registry) -->
+            <!-- TAB 4: PENGATURAN -->
             <section id="tab-settings" class="tab-content hidden space-y-5">
                 <div class="flex items-center justify-between">
                     <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -289,14 +194,12 @@
                     <p class="font-semibold mb-1 flex items-center gap-1">
                         <i data-lucide="layers" class="w-4 h-4 text-indigo-600"></i> Desain Sistem Scalable
                     </p>
-                    Anda dapat menambahkan <strong>Field Tambahan (Custom Fields)</strong> seperti <em>Metode Pembayaran, Catatan, atau Tag</em> secara dinamis tanpa merusak struktur data atau logika chart!
+                    Data tersimpan langsung secara realtime ke database Supabase Cloud.
                 </div>
 
-                <!-- Manage Dynamic Fields Registry -->
                 <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
                     <h3 class="text-sm font-bold text-slate-800">Daftar Field Aktif</h3>
                     <div id="activeFieldsList" class="space-y-2">
-                        <!-- Loaded dynamically -->
                     </div>
 
                     <button type="button" onclick="openAddFieldModal()" class="w-full py-2 px-3 border border-dashed border-emerald-500 text-emerald-700 hover:bg-emerald-50 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition">
@@ -305,15 +208,11 @@
                     </button>
                 </div>
 
-                <!-- Data Management -->
                 <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
                     <h3 class="text-sm font-bold text-slate-800">Kelola Data</h3>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-1 gap-2">
                         <button type="button" onclick="exportDataJSON()" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition">
                             <i data-lucide="download" class="w-4 h-4"></i> Ekspor JSON
-                        </button>
-                        <button type="button" onclick="resetToSampleData()" class="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition">
-                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Data Contoh
                         </button>
                     </div>
                 </div>
@@ -364,7 +263,7 @@
                         <select id="newFieldType" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="text">Teks Bebas</option>
                             <option value="number">Angka / Nominal</option>
-                            <option value="select">Pilihan Drodown</option>
+                            <option value="select">Pilihan Dropdown</option>
                         </select>
                     </div>
                     <div id="optionsGroup" class="hidden">
@@ -386,7 +285,7 @@
                     <i data-lucide="alert-triangle" class="w-6 h-6"></i>
                 </div>
                 <h3 id="confirmTitle" class="font-bold text-sm text-slate-800">Hapus Transaksi?</h3>
-                <p id="confirmMessage" class="text-xs text-slate-500">Data yang dihapus tidak dapat dikembalikan.</p>
+                <p id="confirmMessage" class="text-xs text-slate-500">Data yang dihapus dari Supabase tidak dapat dikembalikan.</p>
                 <div class="flex gap-2 pt-2">
                     <button id="confirmCancelBtn" class="flex-1 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold">Batal</button>
                     <button id="confirmOkBtn" class="flex-1 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold">Hapus</button>
@@ -397,66 +296,57 @@
     </div>
 
     <script>
-        /**
-         * CATATUANG ARCHITECTURE ENGINE
-         * ----------------------------------------------------
-         * Modular, Scalable & Offline-first using LocalStorage.
-         */
+        // 1. INISIALISASI SUPABASE REALTIME DATABASE
+        const SUPABASE_URL = 'https://sefcuozunezjkshuwaat.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_wQndiZeEmYiQcOPDl_skGw_0I29tmtn';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 1. SMART CATEGORY DEFINITIONS & KEYWORD MATCHING RULES
+        // 2. KATEGORI UTAMA & KATA KUNCI
         const CATEGORIES = [
             { id: 'cat_makanan', name: 'Makanan & Minuman', color: '#10B981', icon: 'utensils', keywords: ['nasi', 'kopi', 'makan', 'minum', 'ayam', 'bakso', 'indomie', 'soto', 'cafe', 'kafe', 'warung', 'snack', 'boba', 'pizza', 'burger', 'rames', 'gofood', 'grabfood', 'shopeefood', 'es', 'roti', 'teh', 'jus', 'martabak', 'sate', 'sarapan', 'dinner', 'lunch'] },
             { id: 'cat_transport', name: 'Transportasi', color: '#3B82F6', icon: 'car', keywords: ['bensin', 'ojek', 'grab', 'gojek', 'parkir', 'tol', 'motor', 'mobil', 'angkot', 'bus', 'kereta', 'tiket', 'pertalite', 'pertamax', 'shell', 'maxim', 'mrt', 'lrt', 'krl', 'service', 'tambal', 'cuci'] },
             { id: 'cat_tagihan', name: 'Tagihan & Utilitas', color: '#EF4444', icon: 'receipt', keywords: ['listrik', 'pulsa', 'kuota', 'wifi', 'indihome', 'pdam', 'air', 'iuran', 'bpjs', 'kontrakan', 'kos', 'cicilan', 'sewa', 'pln', 'telkom', 'kartu kredit', 'asuransi'] },
-            { id: 'cat_belanja', name: 'Belanja', color: '#F59E0B', icon: 'shopping-bag', keywords: ['baju', 'sepatu', 'skincare', 'toko', 'minimarket', 'indomaret', 'alfamart', 'tokopedia', 'shopee', 'lazada', 'pasar', 'sabun', 'celana', 'kaos', 'tas', 'makeup', 'supermarket', 'mall', 'baju'] },
+            { id: 'cat_belanja', name: 'Belanja', color: '#F59E0B', icon: 'shopping-bag', keywords: ['baju', 'sepatu', 'skincare', 'toko', 'minimarket', 'indomaret', 'alfamart', 'tokopedia', 'shopee', 'lazada', 'pasar', 'sabun', 'celana', 'kaos', 'tas', 'makeup', 'supermarket', 'mall'] },
             { id: 'cat_hiburan', name: 'Hiburan', color: '#8B5CF6', icon: 'film', keywords: ['bioskop', 'xxi', 'game', 'steam', 'netflix', 'spotify', 'liburan', 'jalan', 'voucher', 'konser', 'wisata', 'youtube', 'topup', 'dufan', 'drakor'] },
             { id: 'cat_kesehatan', name: 'Kesehatan', color: '#EC4899', icon: 'heart-pulse', keywords: ['obat', 'apotek', 'dokter', 'rumahsakit', 'hospital', 'vitamin', 'masker', 'klinik', 'pemeriksaan', 'tes', 'lab', 'retinoid', 'fisioterapi'] },
             { id: 'cat_pendidikan', name: 'Pendidikan', color: '#06B6D4', icon: 'book-open', keywords: ['buku', 'kursus', 'spp', 'sekolah', 'kuliah', 'pensil', 'alat tulis', 'seminar', 'workshop', 'sertifikasi', 'udemy', 'bimbingan', 'les'] },
             { id: 'cat_lain', name: 'Lain-lain', color: '#64748B', icon: 'more-horizontal', keywords: [] }
         ];
 
-        // 2. DYNAMIC FIELD REGISTRY (Ensures Scalability)
-        // System can add new fields dynamically without altering chart/item core schema!
         let defaultFieldRegistry = [
             {
                 key: 'paymentMethod',
                 label: 'Metode Pembayaran',
                 type: 'select',
                 options: ['QRIS / E-Wallet', 'Tunai', 'Transfer Bank', 'Kartu Kredit'],
-                defaultValue: 'QRIS / E-Wallet',
-                isSystem: false
+                defaultValue: 'QRIS / E-Wallet'
             },
             {
                 key: 'notes',
                 label: 'Catatan Tambahan',
                 type: 'text',
                 options: [],
-                defaultValue: '',
-                isSystem: false
+                defaultValue: ''
             }
         ];
 
-        // LOCAL STORAGE KEYS
-        const STORAGE_KEY_EXPENSES = 'catatuang_expenses_data_v1';
         const STORAGE_KEY_REGISTRY = 'catatuang_field_registry_v1';
 
-        // APP STATE
         let expenses = [];
         let fieldRegistry = [];
         let pieChartInstance = null;
         let isUserCategoryOverridden = false;
 
         // INITIALIZATION
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
             loadFieldRegistry();
-            loadExpensesData();
             initFormDefaults();
             setupEventListeners();
             renderDynamicFormFields();
             renderActiveFieldsList();
-            renderHistoryView();
-            renderAnalyticsView();
-            updateHeaderMetrics();
+            
+            // Ambil data langsung dari Supabase saat aplikasi dibuka
+            await loadExpensesData();
             lucide.createIcons();
         });
 
@@ -478,105 +368,52 @@
             localStorage.setItem(STORAGE_KEY_REGISTRY, JSON.stringify(fieldRegistry));
         }
 
-        function loadExpensesData() {
-            const saved = localStorage.getItem(STORAGE_KEY_EXPENSES);
-            if (saved) {
-                try {
-                    expenses = JSON.parse(saved);
-                } catch(e) {
-                    generateSampleData();
+        // FUNGSI AMBIL DATA LENGKAP DARI SUPABASE CLOUD
+        async function loadExpensesData() {
+            showToast('Mengambil data dari Supabase...', 'info');
+            try {
+                const { data, error } = await supabase
+                    .from('expenses')
+                    .select('*')
+                    .order('date', { ascending: false });
+
+                if (error) {
+                    console.error('Gagal mengambil data dari Supabase:', error.message);
+                    showToast('Gagal memuat data: ' + error.message, 'alert-circle');
+                    expenses = [];
+                } else {
+                    expenses = (data || []).map(item => ({
+                        id: item.id,
+                        date: item.date,
+                        amount: Number(item.amount),
+                        description: item.description,
+                        category: item.category,
+                        customFields: item.extra_fields || {}
+                    }));
                 }
-            } else {
-                generateSampleData();
+            } catch (err) {
+                console.error('Error koneksi Supabase:', err);
+                expenses = [];
             }
-        }
 
-        function saveExpensesData() {
-            localStorage.setItem(STORAGE_KEY_EXPENSES, JSON.stringify(expenses));
             updateHeaderMetrics();
-        }
-
-        function generateSampleData() {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-
-            expenses = [
-                {
-                    id: 'exp_' + Date.now() + '_1',
-                    date: `${year}-${month}-01`,
-                    amount: 35000,
-                    description: 'Nasi Rames & Es Teh',
-                    category: 'Makanan & Minuman',
-                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: 'Makan siang dikantor' },
-                    createdAt: new Date().toISOString()
-                },
-                {
-                    id: 'exp_' + Date.now() + '_2',
-                    date: `${year}-${month}-01`,
-                    amount: 50000,
-                    description: 'Bensin Pertalite Motor',
-                    category: 'Transportasi',
-                    customFields: { paymentMethod: 'Tunai', notes: 'Isi di SPBU Pemuda' },
-                    createdAt: new Date().toISOString()
-                },
-                {
-                    id: 'exp_' + Date.now() + '_3',
-                    date: `${year}-${month}-02`,
-                    amount: 250000,
-                    description: 'Tagihan Pulsa & Kuota Internet',
-                    category: 'Tagihan & Utilitas',
-                    customFields: { paymentMethod: 'Transfer Bank', notes: 'Paket bulanan' },
-                    createdAt: new Date().toISOString()
-                },
-                {
-                    id: 'exp_' + Date.now() + '_4',
-                    date: `${year}-${month}-03`,
-                    amount: 180000,
-                    description: 'Belanja Bulanan Indomaret',
-                    category: 'Belanja',
-                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: 'Sabun, sampo, snack' },
-                    createdAt: new Date().toISOString()
-                },
-                {
-                    id: 'exp_' + Date.now() + '_5',
-                    date: `${year}-${month}-03`,
-                    amount: 45000,
-                    description: 'Kopi Susu Kekinian',
-                    category: 'Makanan & Minuman',
-                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: '' },
-                    createdAt: new Date().toISOString()
-                },
-                {
-                    id: 'exp_' + Date.now() + '_6',
-                    date: `${year}-${month}-04`,
-                    amount: 90000,
-                    description: 'Tiket Nonton Bioskop XXI',
-                    category: 'Hiburan',
-                    customFields: { paymentMethod: 'QRIS / E-Wallet', notes: 'Weekend movie' },
-                    createdAt: new Date().toISOString()
-                }
-            ];
-            saveExpensesData();
+            renderHistoryView();
+            renderAnalyticsView();
         }
 
         function initFormDefaults() {
-            // Set date picker to TODAY by default
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('inputDate').value = today;
 
-            // Populate category select options
             const categorySelect = document.getElementById('inputCategory');
             categorySelect.innerHTML = CATEGORIES.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('');
 
-            // Set default month selectors
             const currentMonthStr = today.substring(0, 7);
             document.getElementById('historyMonthFilter').value = currentMonthStr;
             document.getElementById('analyticsMonthPicker').value = currentMonthStr;
         }
 
         function setupEventListeners() {
-            // Description input smart detection listener
             const descInput = document.getElementById('inputDescription');
             descInput.addEventListener('input', (e) => {
                 if (!isUserCategoryOverridden) {
@@ -584,15 +421,12 @@
                 }
             });
 
-            // Manual Category override listener
             const categorySelect = document.getElementById('inputCategory');
             categorySelect.addEventListener('change', () => {
                 isUserCategoryOverridden = true;
-                const badge = document.getElementById('autoCategoryBadge');
-                badge.classList.add('hidden');
+                document.getElementById('autoCategoryBadge').classList.add('hidden');
             });
 
-            // Amount formatting helper
             const amountInput = document.getElementById('inputAmount');
             const amountFormatted = document.getElementById('amountFormatted');
             amountInput.addEventListener('input', (e) => {
@@ -605,14 +439,10 @@
                 }
             });
 
-            // Form Submit Listener
             document.getElementById('expenseForm').addEventListener('submit', handleFormSubmit);
-
-            // Month Filter Change Listeners
             document.getElementById('historyMonthFilter').addEventListener('change', renderHistoryView);
             document.getElementById('analyticsMonthPicker').addEventListener('change', renderAnalyticsView);
 
-            // Add Custom Field Type Change
             document.getElementById('newFieldType').addEventListener('change', (e) => {
                 const optsGroup = document.getElementById('optionsGroup');
                 if (e.target.value === 'select') {
@@ -623,7 +453,6 @@
             });
         }
 
-        // SMART CATEGORIZATION ENGINE
         function detectCategoryAutomatically(text) {
             if (!text || text.trim() === '') {
                 document.getElementById('autoCategoryBadge').classList.add('hidden');
@@ -640,9 +469,7 @@
                 }
             }
 
-            const categorySelect = document.getElementById('inputCategory');
-            categorySelect.value = matchedCategory;
-
+            document.getElementById('inputCategory').value = matchedCategory;
             const badge = document.getElementById('autoCategoryBadge');
             if (matchedCategory !== 'Lain-lain') {
                 badge.classList.remove('hidden');
@@ -657,13 +484,12 @@
 
             fieldRegistry.forEach(field => {
                 const fieldDiv = document.createElement('div');
-                
                 let inputHTML = '';
                 if (field.type === 'select') {
                     const optionsHTML = field.options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
                     inputHTML = `<select id="dyn_${field.key}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">${optionsHTML}</select>`;
                 } else if (field.type === 'number') {
-                    inputHTML = `<input type="number" id="dyn_${field.key}" placeholder="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">`;
+                    inputHTML = `<input type="number" step="any" id="dyn_${field.key}" placeholder="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">`;
                 } else {
                     inputHTML = `<input type="text" id="dyn_${field.key}" placeholder="${field.label}..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500">`;
                 }
@@ -676,7 +502,8 @@
             });
         }
 
-        function handleFormSubmit(e) {
+        // FUNGSI SIMPAN PENGELUARAN DENGAN SUPABASE
+        async function handleFormSubmit(e) {
             e.preventDefault();
 
             const date = document.getElementById('inputDate').value;
@@ -689,7 +516,6 @@
                 return;
             }
 
-            // Extract dynamic field values automatically
             const customFields = {};
             fieldRegistry.forEach(field => {
                 const el = document.getElementById(`dyn_${field.key}`);
@@ -698,18 +524,26 @@
                 }
             });
 
-            const newExpense = {
-                id: 'exp_' + Date.now(),
-                date,
-                amount,
-                description,
-                category,
-                customFields,
-                createdAt: new Date().toISOString()
-            };
+            showToast('Menyimpan ke Supabase...', 'info');
 
-            expenses.unshift(newExpense);
-            saveExpensesData();
+            const { data, error } = await supabase
+                .from('expenses')
+                .insert([
+                    {
+                        date: date,
+                        amount: amount,
+                        description: description,
+                        category: category,
+                        extra_fields: customFields
+                    }
+                ]);
+
+            if (error) {
+                showToast('Gagal menyimpan: ' + error.message, 'alert-circle');
+                return;
+            }
+
+            showToast('Pengeluaran berhasil dicatat!', 'check-circle');
 
             // Reset Form
             document.getElementById('inputAmount').value = '';
@@ -718,11 +552,8 @@
             document.getElementById('autoCategoryBadge').classList.add('hidden');
             isUserCategoryOverridden = false;
 
-            showToast('Pengeluaran berhasil dicatat!', 'check-circle');
-
-            // Refresh Views
-            renderHistoryView();
-            renderAnalyticsView();
+            // Reload data terbaru dari Supabase
+            await loadExpensesData();
         }
 
         function quickFill(desc, amount) {
@@ -736,10 +567,9 @@
 
         function renderHistoryView() {
             const container = document.getElementById('historyList');
-            const selectedMonth = document.getElementById('historyMonthFilter').value; // YYYY-MM
+            const selectedMonth = document.getElementById('historyMonthFilter').value;
 
-            // Filter expenses by selected month
-            const filtered = expenses.filter(exp => exp.date.startsWith(selectedMonth));
+            const filtered = expenses.filter(exp => exp.date && exp.date.startsWith(selectedMonth));
 
             if (filtered.length === 0) {
                 container.innerHTML = `
@@ -752,14 +582,12 @@
                 return;
             }
 
-            // Group expenses by Date
             const grouped = {};
             filtered.forEach(exp => {
                 if (!grouped[exp.date]) grouped[exp.date] = [];
                 grouped[exp.date].push(exp);
             });
 
-            // Sort dates descending
             const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
 
             let html = '';
@@ -769,7 +597,6 @@
 
                 html += `
                     <div class="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
-                        <!-- Date Header -->
                         <div class="bg-slate-50 px-3.5 py-2 border-b border-slate-100 flex justify-between items-center text-xs">
                             <span class="font-bold text-slate-700 flex items-center gap-1.5">
                                 <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
@@ -779,14 +606,12 @@
                                 Subtotal: ${formatIDR(dailyTotal)}
                             </span>
                         </div>
-                        <!-- Items -->
                         <div class="divide-y divide-slate-100">
                 `;
 
                 grouped[dateStr].forEach(item => {
                     const categoryObj = CATEGORIES.find(c => c.name === item.category) || CATEGORIES[CATEGORIES.length - 1];
                     
-                    // Format custom fields badge pills
                     let customBadges = '';
                     if (item.customFields) {
                         Object.keys(item.customFields).forEach(k => {
@@ -836,19 +661,17 @@
         }
 
         function renderAnalyticsView() {
-            const selectedMonth = document.getElementById('analyticsMonthPicker').value; // YYYY-MM
-            const filtered = expenses.filter(exp => exp.date.startsWith(selectedMonth));
+            const selectedMonth = document.getElementById('analyticsMonthPicker').value;
+            const filtered = expenses.filter(exp => exp.date && exp.date.startsWith(selectedMonth));
 
             const totalAmount = filtered.reduce((sum, item) => sum + item.amount, 0);
             
-            // Calculate Daily Average
             const daysInMonth = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate();
             const avgDaily = totalAmount > 0 ? Math.round(totalAmount / daysInMonth) : 0;
 
             document.getElementById('analyticsTotalText').textContent = formatIDR(totalAmount);
             document.getElementById('analyticsAvgDaily').textContent = `Rata-rata: ${formatIDR(avgDaily)}/hari`;
 
-            // Calculate Totals per Category
             const categoryTotals = {};
             CATEGORIES.forEach(cat => categoryTotals[cat.name] = 0);
 
@@ -860,7 +683,6 @@
                 }
             });
 
-            // Find Max Category
             let maxCat = '-';
             let maxVal = 0;
             Object.keys(categoryTotals).forEach(catName => {
@@ -871,7 +693,6 @@
             });
             document.getElementById('analyticsMaxCategory').textContent = totalAmount > 0 ? `Terbanyak: ${maxCat}` : 'Terbanyak: -';
 
-            // Prepare Data for Chart & Breakdown
             const chartLabels = [];
             const chartData = [];
             const chartColors = [];
@@ -896,10 +717,7 @@
                 });
             });
 
-            // Render Chart.js Pie/Doughnut Chart
             renderChart(chartLabels, chartData, chartColors);
-
-            // Render Percentage Breakdown List
             renderBreakdownList(breakdownData, totalAmount);
         }
 
@@ -911,7 +729,6 @@
             }
 
             if (data.length === 0) {
-                // Empty state chart fallback
                 pieChartInstance = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
@@ -970,13 +787,11 @@
 
         function renderBreakdownList(dataList, total) {
             const container = document.getElementById('categoryBreakdownList');
-            
-            // Sort categories by highest spent
             dataList.sort((a, b) => b.amount - a.amount);
 
             let html = '';
             dataList.forEach(item => {
-                if (item.amount === 0) return; // Hide zero categories
+                if (item.amount === 0) return;
 
                 html += `
                     <div class="bg-white border border-slate-200/80 p-3 rounded-xl space-y-1.5 shadow-sm">
@@ -990,7 +805,6 @@
                                 <span class="text-slate-400 text-[11px] font-semibold ml-1">(${item.percentage}%)</span>
                             </div>
                         </div>
-                        <!-- Progress bar -->
                         <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                             <div class="h-full rounded-full transition-all duration-500" style="width: ${item.percentage}%; background-color: ${item.color}"></div>
                         </div>
@@ -1052,8 +866,7 @@
                 label,
                 type,
                 options,
-                defaultValue: options[0] || '',
-                isSystem: false
+                defaultValue: options[0] || ''
             });
 
             saveFieldRegistry();
@@ -1079,11 +892,10 @@
             const now = new Date();
             const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             
-            // Format Badge Text
             const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
             document.getElementById('currentMonthBadge').textContent = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
 
-            const filtered = expenses.filter(exp => exp.date.startsWith(currentMonthStr));
+            const filtered = expenses.filter(exp => exp.date && exp.date.startsWith(currentMonthStr));
             const total = filtered.reduce((sum, item) => sum + item.amount, 0);
 
             document.getElementById('headerTotalExpense').textContent = formatIDR(total);
@@ -1118,13 +930,22 @@
             document.getElementById('confirmModal').classList.add('hidden');
         });
 
-        document.getElementById('confirmOkBtn').addEventListener('click', () => {
+        // HAPUS DATA REAL DARI SUPABASE
+        document.getElementById('confirmOkBtn').addEventListener('click', async () => {
             if (pendingDeleteId) {
-                expenses = expenses.filter(e => e.id !== pendingDeleteId);
-                saveExpensesData();
-                renderHistoryView();
-                renderAnalyticsView();
-                showToast('Pengeluaran berhasil dihapus.', 'check');
+                showToast('Menghapus dari Supabase...', 'info');
+
+                const { error } = await supabase
+                    .from('expenses')
+                    .delete()
+                    .eq('id', pendingDeleteId);
+
+                if (error) {
+                    showToast('Gagal menghapus: ' + error.message, 'alert-circle');
+                } else {
+                    showToast('Pengeluaran berhasil dihapus.', 'check');
+                    await loadExpensesData();
+                }
             }
             pendingDeleteId = null;
             document.getElementById('confirmModal').classList.add('hidden');
@@ -1154,13 +975,6 @@
             showToast('Data berhasil diekspor!', 'download');
         }
 
-        function resetToSampleData() {
-            generateSampleData();
-            renderHistoryView();
-            renderAnalyticsView();
-            showToast('Data dikembalikan ke contoh awal.', 'rotate-ccw');
-        }
-
         function formatIDR(amount) {
             return new Intl.NumberFormat('id-ID', {
                 style: 'currency',
@@ -1177,7 +991,7 @@
         }
 
         function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, 
+            return (str || '').replace(/[&<>'"]/g, 
                 tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
             );
         }
